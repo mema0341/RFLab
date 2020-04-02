@@ -1,3 +1,1 @@
-"# RFLab" 
-"# RFLab" 
-"# RFLab" 
+The purpose of this project is to keep track of projects I do going through Grad School as well as any interesting side projects that come up along the way. I also want to work on better coding practices so that's a goal as well."# RFLab" 
