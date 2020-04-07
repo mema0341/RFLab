@@ -59,6 +59,7 @@ pmr, pmc = np.shape(matrix)
 unpmr, unpmc = np.shape(nonpadded_matrix)
 
 fm = np.ndarray((pmr, pmc), dtype=object) # Flag Matrix
+node_array = np.ndarray((pmr, pmc), dtype=object) # Flag Matrix
 # fmc = np.ndarray((unpmr,unpmc)) # Flag matrix (color version!)
 
 ax = pmr
@@ -174,35 +175,49 @@ for ii in range(ax):
             print("                %s (%s, %s)     " % (node_vals[2], k_vals[0], k_vals[2]))
             print("%s (%s, %s)    %s (%s, %s)    %s (%s, %s)" % (node_vals[3], k_vals[0], k_vals[3], node_vals[0], k_vals[0], k_vals[0], node_vals[1], k_vals[0], k_vals[1]))
             print("                %s (%s, %s)     " % (node_vals[4], k_vals[0], k_vals[4]))            
+            
+            str_val = ''
+            # str_val = flag + '                %s (%s, %s)     ' % (node_vals[2], k_vals[0], k_vals[2])
+            # str_val = str_val + '%s (%s, %s)    %s (%s, %s)    %s (%s, %s)' % (node_vals[3], k_vals[0], k_vals[3], node_vals[0], k_vals[0], k_vals[0], node_vals[1], k_vals[0], k_vals[1])
+            # str_val = str_val + '                %s (%s, %s)     ' % (node_vals[4], k_vals[0], k_vals[4])
+            # node_array[ii,jj] = str_val
+            
             # Loop through values and add to A
             # center
             if k_vals[0] != -1 and node_vals[0] != 0:
                 print("Center: A[",str(k_vals[0]),str(k_vals[0]),"] =",str(stencil[0]))
                 Am[k_vals[0], k_vals[0]] = stencil[0]
+                str_val = str_val + "Center: A["+str(k_vals[0])+','+str(k_vals[0])+"] ="+str(stencil[0])
 
             # Right
             if k_vals[1] != -1 and node_vals[1] != 0:
                 print("Right: A[",str(k_vals[0]),str(k_vals[1]),"] =",str(stencil[1]))
                 Am[k_vals[0], k_vals[1]] = stencil[1]
+                str_val = str_val + "Right: A["+str(k_vals[0])+','+str(k_vals[1])+"] ="+str(stencil[1])
 
             # Up
             if k_vals[2] != -1 and node_vals[2] != 0:
                 print("Up: A[",str(k_vals[0]),str(k_vals[2]),"] =",str(stencil[2]))
-
+                str_val = str_val + "Up: A["+str(k_vals[0])+','+str(k_vals[2])+"] ="+str(stencil[2])
                 Am[k_vals[0], k_vals[2]] = stencil[2]
 
             if k_vals[3] != -1 and node_vals[3] != 0:    
                 print("Left: A[",str(k_vals[0]),str(k_vals[3]),"] =",str(stencil[3]))
                 Am[k_vals[0], k_vals[3]] = stencil[3]
+                str_val = str_val + "Left: A["+str(k_vals[0])+','+str(k_vals[3])+"] ="+str(stencil[3])
 
             if k_vals[4] != -1 and node_vals[4] != 0:
-                print("Down: A[",str(k_vals[0]),str(k_vals[4]),"] =",str(stencil[4]))
+                print("Down: A["+str(k_vals[0])+str(k_vals[4])+"] ="+str(stencil[4]))
                 Am[k_vals[0], k_vals[4]] = stencil[4]
+                str_val = str_val + "Down: A["+str(k_vals[0])+','+str(k_vals[4])+"] ="+str(stencil[4])
             
             # Place B
             if b_value != 0:
-                print("B[",str(k_vals[0]),"] = ",str(b_value))
+                print("B["+str(k_vals[0])+"] = "+str(b_value))
                 bv[k_vals[0]] = b_value
+                str_val = str_val + "B["+str(k_vals[0])+"] = "+str(b_value)
+            
+            node_array[ii,jj] = str_val
 
 A = np.linalg.inv(Am)
 x = A.dot(bv)
@@ -210,6 +225,10 @@ x = A.dot(bv)
 x = x.reshape((ax, ay))
 
 # save_excel = True
+
+df_node_array = pd.DataFrame(node_array)
+df_node_array.to_excel(r'Exported Data\df_node_array.xlsx', index=False) # save arrays to xlsx file
+
 
 if save_excel:
     # convert flags to dataframe and export
@@ -229,3 +248,9 @@ if save_excel:
     df_x.to_excel(r'Exported Data\x.xlsx', index=False) # save arrays to xlsx file
 
 plot_matrix(np.flipud(x), 'Test?')
+
+for i in range(ax):
+    for j in range(ay):
+        # print("A[i, j] = %s ; A[j,i] = %s" % (A[i,j], A[j, i]))
+        if Am[i,j] != Am[j,i]:
+            print('hey')
