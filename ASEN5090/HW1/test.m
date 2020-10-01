@@ -1,0 +1,1 @@
+t = load('HW1data.dat')

@@ -219,6 +219,7 @@ for ii in range(ax):
             
             node_array[ii,jj] = str_val
 
+# x = A./b
 A = np.linalg.inv(Am)
 x = A.dot(bv)
 # x = Am.dot(bv)
