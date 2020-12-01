@@ -139,7 +139,7 @@ for tt = 1:sz % loop through all input times
 
 
     % Pull out most recent ephemeris values
-%     jj = max( find(dt_input(tt) >= dt_ephem) ); % sat_ephem(:,17) = toe (sec into GPS week) of each entry
+    jj = max( find(dt_input(tt) >= dt_ephem) ); % sat_ephem(:,17) = toe (sec into GPS week) of each entry
                                                 % jj = row of specific sat. ephem. data with epoch closest to input time
     
     % Pull out nearest ephemeris values                                                                                        

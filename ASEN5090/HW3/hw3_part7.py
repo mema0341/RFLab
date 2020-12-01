@@ -49,7 +49,7 @@ no89ECEF = np.asarray(pyproj.transform(lla, ecef, no89_lon, no89_lat, no89_alt))
 # print(no89ECEF)
 
 # Grab satellite data
-ephs, ephsdf = read_GPSyuma(r'data\YUMA245.ALM')
+ephs, ephsdf = read_GPSyuma(r'data\YUMA310.ALM')
 
 # Create time for entire day
 time = np.arange(0,24*60+1,60)*60+172800
@@ -72,12 +72,11 @@ for pp in range(len(prns)):
 
     print('hey')
 
-    current_table = []
     for rr in range(len(time)):
         satECEF = x[rr,:]
 
         [az_, el_, range_] = compute_azelrange(np.asarray(nistECEF), np.asarray(satECEF))
-        current_table.append([int(prns[pp]), np.degrees(az_), np.degrees(el_),range_]) # Append values to a list of lists
+        nist_table.append([int(prns[pp]), np.degrees(az_), np.degrees(el_),range_]) # Append values to a list of lists
 
         # EQUA COORDS
         [az_, el_, range_] = compute_azelrange(np.asarray(equaECEF), np.asarray(satECEF))
@@ -92,20 +91,20 @@ nist_table = np.asarray(nist_table)
 enu_table = np.asarray(enu_table)
 no89_table = np.asarray(no89_table)
 
-# Find the proper elevation values 
-el_vals1 = nist_table[:,2]>0
-el_vals2 = nist_table[:,2]<180
-el_idx = el_vals1 & el_vals2
-print(nist_table[el_idx,:])
-print('\n')
+# # Find the proper elevation values 
+# el_vals1 = nist_table[:,2]>0
+# el_vals2 = nist_table[:,2]<180
+# el_idx = el_vals1 & el_vals2
+# print(nist_table[el_idx,:])
+# print('\n')
 
-# Reduce the table 
-nist_table = nist_table[el_idx,:]
+# # Reduce the table 
+# nist_table = nist_table[el_idx,:]
 
-# Make the table print prettily
-num_cols, num_rows = np.shape(nist_table)
-for cc in range(num_cols):
-    print(int(nist_table[cc, 0]), np.round(nist_table[cc, 1],6), np.round(nist_table[cc, 2],6), np.round(nist_table[cc, 3]))
+# # Make the table print prettily
+# num_cols, num_rows = np.shape(nist_table)
+# for cc in range(num_cols):
+#     print(int(nist_table[cc, 0]), np.round(nist_table[cc, 1],6), np.round(nist_table[cc, 2],6), np.round(nist_table[cc, 3]))
 
 # EQUATOR: Make the Lists of lists variables into arrays
 el_vals1 = enu_table[:,2]>0
