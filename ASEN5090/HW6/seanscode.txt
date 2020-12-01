@@ -1,0 +1,185 @@
+def ExpectedRange(station, Tr, a, satNum):
+	c = 2.99792458e8
+	wE  = 7.2921151467e-5
+	h, sat, cc, rel = broadcast2posM(a,np.array([[2121,2121],[Tr, Tr ]]).transpose(),satNum)
+	Geo = np.linalg.norm(sat[0,:] - station)
+	TimeTrans = Tr - Geo / c
+	h, posHere, cc, rel = broadcast2posM(a,np.array([[2121,2121],[TimeTrans, TimeTrans ]]).transpose(),satNum)
+	phi = wE * (Tr - TimeTrans)
+	rot = np.array([[np.cos(phi), np.sin(phi), 0],[-np.sin(phi), np.cos(phi),0],[0,0,1]])
+	changed = np.dot(rot,posHere[0,:])
+	rangeNew = np.linalg.norm(changed - station)
+
+	while abs(rangeNew - Geo)> 1e-6:
+
+		Geo = rangeNew
+		TimeTrans = Tr - Geo / c
+		h, posHere,cc, rel = broadcast2posM(a,np.array([[2121,2121],[TimeTrans, TimeTrans ]]).transpose(),satNum)
+		phi = wE * (Tr - TimeTrans)
+		rot = np.array([[np.cos(phi), np.sin(phi), 0],[-np.sin(phi), np.cos(phi),0],[0,0,1]])
+		changed = rot @ posHere[0,:]
+		rangeNew = np.linalg.norm(changed - station)
+	aer =azelrange(station, changed.reshape(1,3))
+	#print(aer)
+	az = aer[0,0]
+	el = aer[0,1]
+	return rangeNew , cc, rel, az, el, changed
+
+
+def TopoCorrect (els, zd):
+	Del = np.zeros(els.size)
+	i=0
+	if els.size>1:
+		for el in els:
+			el = el* np.pi/180
+			md = 1/(np.sin(el))
+			Del[i] = zd *md
+			i+=1
+	else:
+		el = els* np.pi/180
+		md = 1/(np.sin(el))
+		Del= zd *md
+	return Del
+def Ionofree (pr1, f1, pr2, f2):
+	prif = np.zeros(pr1.size)
+	correction = np.zeros(pr1.size)
+	for i in range(pr1.size):
+		prif[i] = (pr1[i]*f1**2 - pr2[i]*f2**2)/(f1**2-f2**2)
+		correction[i] = (f2**2/(f1**2 - f2**2)) *(pr2[i]-pr1[i])
+	return prif, correction
+
+
+#read nav file
+head, a = parse_rinex_nav_file('brdc2450.20n')
+
+
+timevec = np.arange(172800, 172800+86401, 31)
+weeks = np.ones(len(timevec)) *2121
+
+#read NIST Location
+with open("NIST_location.txt", 'r') as file:
+	file.readline()
+	pos = file.readline()
+strings = pos.split()
+pos_1 = np.array([float(part) for part in strings])
+vec1_ECEF = pos_1.transpose()
+
+#Frequencies of L1 and L2
+L1f = 1575.42e6 
+L2f = 1227.60e6 
+
+fig = plt.figure()
+axpr = fig.add_subplot(111)
+#read observation data
+head, obs_data = parse_rinex_obs_file("nist2450.20o")
+
+#Define the time we want to find observations for:
+base = np.datetime64("2020-09-01T00:00:00")
+#Washington ECEF estimate
+Washington = llatoECEF(38.889, -77.049, 0)
+#defining some things
+i = 0
+ExRa = []
+PR = []
+Clock = []
+Rel = []
+Tropo = []
+Az = []
+El =[]
+PRNs = []
+Resid = []
+G = np.empty((0,4), float)
+for Sat in obs_data:
+	if obs_data[Sat].time[0] == base:
+		print()
+		print("PRN: {}".format(int(Sat[1:])))
+		iofree, iocorr = Ionofree(np.array(obs_data[Sat].signals["L1"].pr[0:2]), L1f, obs_data[Sat].signals["L2"].pr[0:2], L2f)
+		ER, cc, relativity, azimuth,elevation, sat_Vec = ExpectedRange(vec1_ECEF, 172800,a, int(Sat[1:])) #grabbing the integer PRN from the Satellite GXX string
+		tropoCorr =  TopoCorrect(elevation, 2)
+		print("Expected Range: {} m".format(ER))
+		print("Iono-Corrected : {} m".format(iofree[0]))
+		print("Clock Correction: {} m".format(cc))
+		print("Relativity Correction: {} m".format(relativity))
+		print("Azimuth: {} deg   Elevation: {} deg".format(azimuth, elevation))
+		print("Tropo Correction: {} m".format(tropoCorr))
+		Corrected = iofree + cc + relativity -tropoCorr
+		row = [-(sat_Vec[0]- vec1_ECEF[0])/ ER, -(sat_Vec[1]- vec1_ECEF[1])/ ER, -(sat_Vec[2]- vec1_ECEF[2])/ ER, 1]
+		G = np.append(G, np.array([row]), axis = 0)
+		ExRa = np.append(ExRa, ER)
+		PR = np.append(PR, iofree)
+		Clock = np.append(Clock, cc)
+		Rel = np.append(Rel, relativity)
+		Tropo = np.append(Tropo, tropoCorr)
+		Az = np.append(Az, azimuth)
+		El = np.append(El, elevation)
+		PRNs = np.append(PRNs, int(Sat[1:]))
+		#print(iofree)
+		dy = iofree[0] - (ER - cc -relativity + tropoCorr )
+		Resid = np.append(Resid, dy)
+		i+=1
+
+
+print(G)
+print(Resid)
+
+plt.scatter(El, Resid)
+
+plt.grid()
+plt.title('Psuedorange Residuals vs Elevation')
+plt.xlabel('Elevation (deg)')
+plt.ylabel('Psuedorange Residual (m)')
+plt.show()
+c = 2.99792458e8
+#Performs the least-squares estimation, but without crappy numpy inverse methods.
+delt, _, _, _ = np.linalg.lstsq(G, Resid)
+print(delt)
+print()
+#this is the correction I would do if problem 6 asked for it.
+newr = vec1_ECEF + delt[0:3]
+timeN = 172800 + delt[3]/c 
+
+newr = np.array(list(Washington))
+#newr = vec1_ECEF
+#print(newr)
+print("Intitial Guess: {}".format(newr))
+timeN = 172800
+for i in range(5):
+	G = np.empty((0,4), float)
+	Resid = []
+	#go through all the satellites.
+	for Sat in obs_data:
+		if obs_data[Sat].time[0] == base:
+			#get data and do calculations if it is visible at time = base
+			iofree, iocorr = Ionofree(np.array(obs_data[Sat].signals["L1"].pr[0:2]), L1f, obs_data[Sat].signals["L2"].pr[0:2], L2f)
+			ER, cc, relativity, azimuth,elevation, sat_Vec = ExpectedRange(newr, timeN,a, int(Sat[1:])) #grabbing the integer PRN from the Satellite GXX string
+			tropoCorr =  TopoCorrect(elevation, 2)
+			
+			#a new row for the G matrix
+			row = [-(sat_Vec[0]- vec1_ECEF[0])/ ER, -(sat_Vec[1]- vec1_ECEF[1])/ ER, -(sat_Vec[2]- vec1_ECEF[2])/ ER, 1]
+			G = np.append(G, np.array([row]), axis = 0)
+			#The Residual, we'll keep trying to change ER and time 
+			dy = iofree[0] - (ER - cc -relativity + tropoCorr )
+			Resid = np.append(Resid, dy)
+	#do least squares and continue
+	delt, _, _, _ = np.linalg.lstsq(G, Resid, rcond = None)
+	newr = newr + delt[0:3]
+	timeN = timeN + delt[3]/c
+	print("iteration: {}".format(i+1))
+	print()
+	print("delta : {}".format(delt))
+	print("Position Est.: {}".format(newr))
+	print("Time Est.: {}".format(timeN))
+
+print("Reference Point (NIST): {}".format(vec1_ECEF))
+lati,longi,alt = ECEFtolla(vec1_ECEF)
+err = newr - vec1_ECEF
+print()
+C = ECEF_ENU_Transform(lati,longi)
+errENU = C @ np.transpose([err])
+print("ECEF-ENU Matrix")
+print(C)
+print()
+print("Error(E): {:.2f} m".format(errENU[0,0]))
+print("Error(N): {:.2f} m".format(errENU[1,0]))
+print("Error(U): {:.2f} m".format(errENU[2,0]))
+print()
